@@ -1,13 +1,14 @@
 # ByteMe
 
-## Phân tầng chung
+## Phân tầng theo nhiệm vụ (Package-by-Layer)
 
+Mã nguồn được tổ chức theo nhiệm vụ của từng tầng kỹ thuật; các quy tắc phân tầng được `src/test/java/org/example/ArchitectureTest.java` (ArchUnit) kiểm tra tự động.
 | Tầng | Package | Trách nhiệm | Được phép phụ thuộc |
 | --- | --- | --- | --- |
 | Bảo mật | `config.SecurityConfiguration`, `platform.security` | Xác thực JWT, phân quyền endpoint theo vai trò, giới hạn đăng nhập | Spring Security |
-| API | `<module>.controller`, `<module>.dto` | Nhận/trả JSON, `@Valid` kiểm tra trường bắt buộc/độ dài (Food/Cart/Order), lấy user từ JWT (`CurrentUser.id`) | Service, DTO, enum của module, `shared.api`, Spring Web |
-| Nghiệp vụ | `<module>.service` | Quy tắc nghiệp vụ (Order kiểm tra trường bắt buộc theo DINE_IN/DELIVERY và phương thức thanh toán), ranh giới transaction (`@Transactional`), ném lỗi nghiệp vụ (`BusinessException` ở Food/Cart/Order; `AuthFailure`, `DuplicateAccountException`, `AccountPersistenceException` ở Auth) | Repository/entity của chính module, service/dto của module khác. **Không** import Spring Web/HTTP, Servlet, Spring Data, JDBC, JPA, Hibernate |
-| Truy cập dữ liệu | `<module>.repository`, `<module>.entity` | Spring Data JPA (CRUD, query method tự khai báo, `CartRepository.saveChanges`) | JPA/Hibernate, MySQL |
+| API / Web | `controller`, `dto` | Tiếp nhận và điều hướng HTTP/JSON request, `@Valid` kiểm tra dữ liệu đầu vào, bóc tách `CurrentUser` | Service, DTO, entity enum, `shared.api`, Spring Web |
+| Nghiệp vụ | `service` | Quy tắc nghiệp vụ, ranh giới transaction (`@Transactional`), ném lỗi nghiệp vụ (`BusinessException` ở Food/Cart/Order; `AuthFailure`, `DuplicateAccountException`, `AccountPersistenceException` ở Auth) | Repository, Entity, DTO, các Service khác. **Không** import Spring Web/HTTP, Servlet, Spring Data, JDBC, JPA, Hibernate |
+| Truy cập dữ liệu | `repository`, `entity` | Spring Data JPA (CRUD, custom query, `CartRepository.saveChanges`), ánh xạ thực thể CSDL | JPA/Hibernate, MySQL |
 | Dùng chung | `common`, `shared.api` | `BusinessException`, `CurrentUser`, `ApiError`, `GlobalErrors`; `AuthenticatedUser`, `Role` | — |
 
 Lỗi nghiệp vụ: service của Food/Cart/Order ném `BusinessException(type, code, message)`; `GlobalErrors` đổi `INVALID/FORBIDDEN/NOT_FOUND/CONFLICT` thành 400/403/404/409 với body `{status, code, message, path, fieldErrors}`. Auth giữ handler riêng `AuthErrors` cho `AuthFailure` và `DuplicateAccountException`.
@@ -23,57 +24,60 @@ flowchart TB
 
     Security["Spring Security filter chain<br/>JWT RS256 + phân quyền theo vai trò<br/>LoginIpFilter cho /api/auth/token"]
 
-    subgraph App["Một ứng dụng Spring Boot — Modular Monolith"]
+    subgraph App["Ứng dụng Spring Boot — Kiến trúc phân tầng (Package-by-Layer)"]
         direction TB
-        subgraph Auth["auth — UC01–UC02"]
+        subgraph Controllers["Tầng API / Web: org.example.controller"]
             AuthAPI["AuthController"]
-            AuthCore["RegisterService / LoginService"]
-            AuthRepo["AccountRepository → MySqlAccountRepository → UserRepository (JPA)"]
-            AuthAPI --> AuthCore --> AuthRepo
-        end
-        subgraph Food["food — UC03–UC08"]
             FoodAPI["FoodController"]
-            FoodCore["FoodService"]
-            FoodRepo["FoodRepository / CategoryRepository (JPA)"]
-            FoodAPI --> FoodCore --> FoodRepo
-        end
-        subgraph Cart["cart — UC09–UC12"]
             CartAPI["CartController"]
-            CartCore["CartService"]
-            CartRepo["CartRepository (JPA)"]
-            CartAPI --> CartCore --> CartRepo
-        end
-        subgraph Order["order — UC13–UC18"]
             OrderAPI["OrderController"]
-            OrderCore["OrderService"]
-            OrderRepo["OrderRepository (JPA)"]
-            OrderAPI --> OrderCore --> OrderRepo
         end
+
+        subgraph Services["Tầng Nghiệp vụ: org.example.service"]
+            AuthCore["RegisterService / LoginService / AuthValidation"]
+            FoodCore["FoodService"]
+            CartCore["CartService"]
+            OrderCore["OrderService"]
+        end
+
+        subgraph Repositories["Tầng Dữ liệu: org.example.repository"]
+            AuthRepo["AccountRepository / MySqlAccountRepository / UserRepository"]
+            FoodRepo["FoodRepository / CategoryRepository"]
+            CartRepo["CartRepository"]
+            OrderRepo["OrderRepository"]
+        end
+
+        subgraph Entities["Tầng Thực thể & DTO: org.example.entity / org.example.dto"]
+            EntityModel["User, Food, Category, Cart, CartItem, Order, OrderItem, OrderStatus..."]
+            DtoModel["FoodDto, CartDto, OrderDto, LoginRequest, RegisterRequest..."]
+        end
+
         Platform["platform: BCryptPasswordHasher, LocalRsaTokenIssuer, LoginRateLimiter"]
         Common["common: BusinessException, GlobalErrors, CurrentUser"]
+
+        Controllers --> Services
+        Services --> Repositories
+        Services --> DtoModel
+        Repositories --> EntityModel
         AuthCore -.->|"PasswordHasher / TokenIssuer"| Platform
         CartCore -->|"getAvailableFood, findByIds"| FoodCore
         OrderCore -->|"getItemsForCheckout, clearCart"| CartCore
         OrderCore -->|"reserveStock, releaseStock"| FoodCore
     end
 
-    Security -->|"/api/auth/*"| AuthAPI
-    Security -->|"/api/foods/*"| FoodAPI
-    Security -->|"/api/cart/*"| CartAPI
-    Security -->|"/api/orders/*"| OrderAPI
+    Security --> Controllers
 
     DB[("MySQL 8.4: users, categories, foods, carts, cart_items, orders, order_items")]
-    AuthRepo --> DB
-    FoodRepo --> DB
-    CartRepo --> DB
-    OrderRepo --> DB
+    Repositories --> DB
 ```
 
-Ranh giới giữa module:
+Mũi tên giữa các service là lời gọi Java trực tiếp. Các method được gọi đều là `@Transactional` với propagation mặc định (`REQUIRED`), nên khi `OrderService` gọi `CartService`/`FoodService` thì tất cả tham gia **cùng một transaction**: commit cùng nhau hoặc rollback cùng nhau.
+
+Quy tắc ranh giới phân tầng:
 
 - `CartItem` chỉ lưu `foodId`; Cart lấy thông tin món để hiển thị qua `FoodService.findByIds` và kiểm tra món còn bán qua `FoodService.getAvailableFood`.
-- `OrderItem` chỉ lưu `foodId` cùng snapshot `foodName`/`unitPrice`; Order không dùng entity `Food`.
-- Không module nào dùng `entity`/`repository`/`controller` của Food, Cart, Order từ bên ngoài module đó.
+- `OrderItem` chỉ lưu `foodId` cùng snapshot `foodName`/`unitPrice`; Order không phụ thuộc entity `Food`.
+- Controller chỉ gọi qua Service; không bao giờ gọi trực tiếp Repository. Service không phụ thuộc Controller.
 
 ## Sequence UC13 — Tạo đơn hàng
 
