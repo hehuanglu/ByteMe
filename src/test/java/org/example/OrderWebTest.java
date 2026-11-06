@@ -15,11 +15,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.example.common.BusinessException;
 import org.example.config.SecurityConfiguration;
-import org.example.order.controller.OrderController;
-import org.example.order.dto.OrderDto;
-import org.example.order.dto.OrderPage;
-import org.example.order.domain.*;
-import org.example.order.service.OrderService;
+import org.example.controller.OrderController;
+import org.example.dto.OrderDto;
+import org.example.dto.OrderPage;
+import org.example.entity.*;
+import org.example.service.OrderService;
 import org.example.platform.security.LoginRateLimiter;
 import org.example.shared.api.Role;
 import static org.mockito.ArgumentMatchers.*;
@@ -87,7 +87,7 @@ class OrderWebTest {
                 .andExpect(jsonPath("$.items[0].foodName").value("Tên snapshot"))
                 .andExpect(jsonPath("$.createdAt").value("2026-10-08T01:58:00Z"))
                 .andExpect(jsonPath("$.userId").value(4)).andExpect(jsonPath("$.tableNumber").value("B05"));
-        verify(service).create(eq(4L), eq(new org.example.order.dto.CreateOrderRequest(
+        verify(service).create(eq(4L), eq(new org.example.dto.CreateOrderRequest(
                 OrderType.DINE_IN, "B05", null, null, null, PaymentMethod.CASH, null)));
     }
 

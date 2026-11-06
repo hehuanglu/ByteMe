@@ -11,9 +11,9 @@ import org.springframework.context.annotation.*;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.example.auth.dto.*;
-import org.example.auth.repository.AccountRepository;
-import org.example.auth.service.*;
+import org.example.dto.*;
+import org.example.repository.AccountRepository;
+import org.example.service.*;
 import org.example.platform.security.*;
 @Configuration
 public class AdapterConfiguration {

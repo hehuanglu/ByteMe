@@ -8,11 +8,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import org.example.common.BusinessException;
-import org.example.food.dto.FoodRequest;
-import org.example.food.entity.Food;
-import org.example.food.repository.CategoryRepository;
-import org.example.food.repository.FoodRepository;
-import org.example.food.service.FoodService;
+import org.example.dto.FoodRequest;
+import org.example.entity.Food;
+import org.example.repository.CategoryRepository;
+import org.example.repository.FoodRepository;
+import org.example.service.FoodService;
 import org.junit.jupiter.api.Test;
 
 class FoodServiceTest {

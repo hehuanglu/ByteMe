@@ -1,12 +1,12 @@
 package org.example;
 
 import java.time.Instant;
-import org.example.cart.controller.CartController;
-import org.example.cart.service.CartService;
+import org.example.controller.CartController;
+import org.example.service.CartService;
 import org.example.common.BusinessException;
 import org.example.config.SecurityConfiguration;
-import org.example.food.controller.FoodController;
-import org.example.food.service.FoodService;
+import org.example.controller.FoodController;
+import org.example.service.FoodService;
 import org.example.platform.security.LoginRateLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

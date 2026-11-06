@@ -40,15 +40,11 @@ class ArchitectureTest {
                 .check(CLASSES);
     }
 
-    @Test void foodCartAndOrderOnlyTalkThroughEachOthersServices() {
-        for (String module : new String[]{"food", "cart", "order"}) {
-            String root = "org.example." + module;
-            noClasses().that().resideOutsideOfPackage(root + "..")
-                    .should().dependOnClassesThat().resideInAnyPackage(
-                            root + ".entity..", root + ".repository..", root + ".controller..")
-                    .because("module khác chỉ được gọi service/dto của module " + module)
-                    .check(CLASSES);
-        }
+    @Test void repositoriesDoNotDependOnControllers() {
+        noClasses().that().resideInAPackage("..repository..")
+                .should().dependOnClassesThat().resideInAPackage("..controller..")
+                .because("Tầng repository không phụ thuộc vào controller")
+                .check(CLASSES);
     }
 
     @Test void servicesDoNotDependOnControllers() {

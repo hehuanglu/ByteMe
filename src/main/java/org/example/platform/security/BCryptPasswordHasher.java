@@ -2,7 +2,7 @@ package org.example.platform.security;
 
 import java.nio.charset.StandardCharsets;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.example.auth.service.PasswordHasher;
+import org.example.service.PasswordHasher;
 
 public final class BCryptPasswordHasher implements PasswordHasher {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
