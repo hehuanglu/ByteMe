@@ -1,0 +1,78 @@
+name: Performance smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  k6-smoke:
+    name: k6 smoke / ByteMe catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Create ephemeral JWT keys
+        run: |
+          mkdir -p .local/docker-keys
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out .local/docker-keys/private.pem
+          openssl pkey -in .local/docker-keys/private.pem -pubout -out .local/docker-keys/public.pem
+
+      - name: Start ByteMe
+        run: |
+          docker compose up --build --detach
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health >/dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 90 ]; then
+              docker compose ps
+              docker compose logs --no-color
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Load deterministic sample data
+        run: docker compose exec -T mysql sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < /opt/byteme/seed.sql'
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: "2.3.0"
+
+      - name: Run performance smoke suite
+        env:
+          BASE_URL: http://127.0.0.1:8080
+        run: |
+          mkdir -p reports/performance
+          k6 run --quiet --no-color \
+            --out csv=reports/performance/smoke-metrics.csv \
+            tests/performance/smoke.js
+
+      - name: Publish result in job summary
+        if: ${{ always() && hashFiles('reports/performance/smoke-summary.json') != '' }}
+        run: |
+          echo '## ByteMe k6 smoke result' >> "$GITHUB_STEP_SUMMARY"
+          jq -r '"- Checks passed: " + ((.metrics.checks.values.rate * 100) | tostring) + "%\n- HTTP failure rate: " + ((.metrics.http_req_failed.values.rate * 100) | tostring) + "%\n- HTTP p95: " + (.metrics.http_req_duration.values["p(95)"] | tostring) + " ms\n- Requests: " + (.metrics.http_reqs.values.count | tostring)' reports/performance/smoke-summary.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect service logs
+        if: ${{ always() }}
+        run: |
+          mkdir -p reports/performance
+          docker compose ps > reports/performance/compose-status.txt
+          docker compose logs --no-color > reports/performance/compose.log
+
+      - name: Upload performance evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: performance-smoke-${{ github.run_id }}
+          path: reports/performance/
+          if-no-files-found: error
+          retention-days: 14
