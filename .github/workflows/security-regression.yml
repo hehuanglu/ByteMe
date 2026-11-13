@@ -59,7 +59,7 @@ jobs:
       - name: Run the ByteMe security suite
         id: suite
         run: |
-          bash "$GITHUB_WORKSPACE/runner/tests/security/run_zap_product_suite.sh" \
+          exec bash "$GITHUB_WORKSPACE/runner/tests/security/run_zap_product_suite.sh" \
             --cases "$GITHUB_WORKSPACE/product/tests/security/cases" \
             --product-source "$GITHUB_WORKSPACE/product" \
             --expected-product-sha "$EXPECTED_PRODUCT_SHA" \
@@ -92,11 +92,24 @@ jobs:
           fields = ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_EVENT_NAME",
                     "EXPECTED_PRODUCT_SHA", "PRODUCT_CHECKOUT", "RUNTIME_CHECKOUT",
                     "PYTHON_SETUP", "PREFLIGHT", "SUITE_EXECUTION")
-          diagnostic = {"status": "ERROR", "code": "BOOTSTRAP_FAILED",
+          status = "CANCELLED" if os.environ.get("SUITE_EXECUTION") == "cancelled" else "ERROR"
+          code = "SUITE_CANCELLED" if status == "CANCELLED" else "BOOTSTRAP_FAILED"
+          destination = Path(sys.argv[1])
+          diagnostic = {"status": status, "code": code,
                         **{key: os.environ.get(key) for key in fields}}
-          Path(sys.argv[1]).write_text(json.dumps(diagnostic, sort_keys=True) + "\n")
+          cleanup_file = Path(os.environ["RUNNER_TEMP"]) / "zap-results/fallback-cleanup.json"
+          if cleanup_file.is_file():
+              cleanup = json.loads(cleanup_file.read_text())
+              diagnostic["fallbackCleanup"] = {
+                  "status": cleanup["status"],
+                  "recordCount": len(cleanup["records"]),
+              }
+              (destination.parent / cleanup_file.name).write_text(
+                  json.dumps(cleanup, sort_keys=True) + "\n")
+          destination.write_text(json.dumps(diagnostic, sort_keys=True) + "\n")
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
+              summary.write(f"## ZAP regression · {status}\n\n`{code}`. See bootstrap.json.\n")
           PY
-            printf '## ZAP regression · ERROR\n\n`BOOTSTRAP_FAILED`. See bootstrap.json.\n' >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           python3 "$GITHUB_WORKSPACE/runner/tests/security/ci/write_summary.py" "$results"
