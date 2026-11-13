@@ -19,7 +19,7 @@
       "id": "swagger-index",
       "method": "GET",
       "origin": "product",
-      "path": "/__zap_ci_missing__/index.html"
+      "path": "/swagger-ui/index.html"
     }
   ],
   "requireResponses": {
