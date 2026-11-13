@@ -1,5 +1,6 @@
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
+RUN exit 42
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
 RUN chmod +x mvnw
