@@ -19,3 +19,6 @@ Thumbs.db
 # Dataset Kaggle: tạo theo kaggle/script/README.md (bước 0), không commit
 kaggle/dataset/
 __pycache__/
+
+# Generated k6 evidence (uploaded by CI as an artifact)
+reports/performance/

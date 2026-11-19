@@ -200,6 +200,22 @@ Client không gửi danh sách món hay đơn giá; hệ thống tự đọc t�
   - Kịch bản k6 trên Kaggle CPU: [kaggle/results/phase1-baseline/README.md](kaggle/results/phase1-baseline/README.md).
   - Đánh giá OWASP ZAP & kiểm tra phân quyền BOLA: [docs/security-report.md](docs/security-report.md).
 
+### Performance smoke suite trên GitHub Actions
+
+Workflow `Performance smoke` dựng MySQL và ByteMe từ đúng commit của pull request, nạp dữ liệu mẫu rồi chạy
+[`tests/performance/smoke.js`](tests/performance/smoke.js). Suite ngắn này kiểm tra ba luồng đọc catalog và áp dụng
+ngưỡng ban đầu cho tỷ lệ check, lỗi HTTP, p95 và p99. Mỗi lần chạy lưu summary JSON, metrics CSV và log Docker
+thành artifact trong 14 ngày.
+
+Chạy cùng suite ở local sau khi đã khởi động và nạp dữ liệu mẫu:
+
+```sh
+mkdir -p reports/performance
+BASE_URL=http://127.0.0.1:8080 k6 run \
+  --out csv=reports/performance/smoke-metrics.csv \
+  tests/performance/smoke.js
+```
+
 ---
 
 ## 7. Tài liệu kỹ thuật chi tiết
