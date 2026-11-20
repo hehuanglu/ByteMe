@@ -23,7 +23,8 @@ public class SecurityConfiguration {
           .addFilterBefore(new LoginIpFilter(limiter,json),UsernamePasswordAuthenticationFilter.class).build();
     }
     @Bean @Order(2) SecurityFilterChain protectedApi(HttpSecurity http,ObjectMapper json) throws Exception {
-        return http.csrf(csrf->csrf.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        return http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.deny()))
+          .csrf(csrf->csrf.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
           .authorizeHttpRequests(auth->auth.requestMatchers("/error", "/openapi.yaml","/swagger-ui.html","/swagger-ui/**", "/v3/api-docs/swagger-config", "/actuator/health", "/actuator/health/**").permitAll()
               .requestMatchers(HttpMethod.GET, "/api/foods", "/api/foods/**").permitAll()
               .requestMatchers(HttpMethod.POST, "/api/foods").hasRole("ADMIN")
