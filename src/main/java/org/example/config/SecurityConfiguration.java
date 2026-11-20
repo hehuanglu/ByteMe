@@ -1,6 +1,4 @@
 package org.example.config;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.List;
 import org.springframework.http.HttpMethod;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,19 +23,7 @@ public class SecurityConfiguration {
           .addFilterBefore(new LoginIpFilter(limiter,json),UsernamePasswordAuthenticationFilter.class).build();
     }
     @Bean @Order(2) SecurityFilterChain protectedApi(HttpSecurity http,ObjectMapper json) throws Exception {
-        boolean isolatedZapFixture = isIsolatedZapFixture();
-        return http.headers(headers -> {
-            if (isolatedZapFixture) {
-                headers.frameOptions(frameOptions -> frameOptions.disable());
-                headers.addHeaderWriter((request, response) -> {
-                    if (!"/swagger-ui/index.html".equals(request.getRequestURI())) {
-                        response.setHeader("X-Frame-Options", "DENY");
-                    }
-                });
-            } else {
-                headers.frameOptions(frameOptions -> frameOptions.deny());
-            }
-          })
+        return http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.deny()))
           .csrf(csrf->csrf.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
           .authorizeHttpRequests(auth->auth.requestMatchers("/error", "/openapi.yaml","/swagger-ui.html","/swagger-ui/**", "/v3/api-docs/swagger-config", "/actuator/health", "/actuator/health/**").permitAll()
               .requestMatchers(HttpMethod.GET, "/api/foods", "/api/foods/**").permitAll()
@@ -62,18 +48,5 @@ public class SecurityConfiguration {
               s.setStatus(403);s.setContentType("application/json");s.setHeader("Cache-Control","no-store");
               json.writeValue(s.getOutputStream(),new ApiError(403,"FORBIDDEN","Không có quyền truy cập.",r.getRequestURI()));
           })).build();
-    }
-
-    private boolean isIsolatedZapFixture() {
-        // The existing CI runner assigns this alias to the app on its private Docker network.
-        // Keep the test response limited to that fixture and the exact Swagger document.
-        if (!"/run/auth/private.pem".equals(System.getenv("AUTH_JWT_PRIVATE_KEY_FILE"))) {
-            return false;
-        }
-        try {
-            return InetAddress.getLocalHost().equals(InetAddress.getByName("byteme-backend"));
-        } catch (UnknownHostException ignored) {
-            return false;
-        }
     }
 }
